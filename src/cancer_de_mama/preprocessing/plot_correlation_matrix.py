@@ -7,7 +7,7 @@ import seaborn as sns
 class MatrixCorrelation:
     def __init__(self, data_frame):
         self.feature_columns = data_frame
-        self.output_dir = Path("results/graphics")
+        self.output_dir = Path("results")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.df = data_frame
         sns.set_theme(style="whitegrid")
@@ -37,7 +37,7 @@ class MatrixCorrelation:
         plt.tight_layout()
 
         plt.savefig(
-            self.output_dir / "matriz_correlacao.png",
+            self.output_dir / "graphics/matriz_correlacao.png",
             dpi=300,
             bbox_inches="tight"
         )
