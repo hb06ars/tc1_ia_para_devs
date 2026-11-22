@@ -2,6 +2,7 @@ from typing import Any
 
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -80,7 +81,15 @@ class Modeling:
                 steps=[
                     ("imputer", SimpleImputer(strategy="median")),
                     ("scaler", StandardScaler()),
-                    ("classifier", SVC(kernel="rbf", random_state=self.RANDOM_STATE)),
+                    (
+                        "classifier",
+                        CalibratedClassifierCV(
+                            estimator=SVC(kernel="rbf", random_state=self.RANDOM_STATE),
+                            method="sigmoid",
+                            cv=5,
+                            ensemble=False,
+                        ),
+                    ),
                 ]
             ),
 

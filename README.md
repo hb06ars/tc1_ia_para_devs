@@ -92,7 +92,31 @@ docker run --rm -it --mount "type=bind,source=$resultsPath,target=/app/results" 
 
 Para utilizar a previsão em outro código Python, importe `BreastCancerPredictor` de `src.cancer_de_mama.prediction.breast_cancer_predictor` e chame `predict_one()` com um dicionário contendo os nomes e valores das 30 características.
 
-O SVM retorna um score de decisão, não uma probabilidade clínica. Esta previsão é uma demonstração acadêmica; não deve ser usada para diagnosticar ou orientar tratamento.
+O SVM usa a estimativa de probabilidade do scikit-learn para apresentar probabilidades aproximadas de cada classe. Essas porcentagens não são medidas de precisão ou certeza clínica. Esta previsão é uma demonstração acadêmica; não deve ser usada para diagnosticar ou orientar tratamento.
+
+## Interface web para previsão de CSV
+
+Depois de gerar o modelo com `python main.py`, inicie a API e a página web:
+
+```powershell
+python web.py
+```
+
+Abra `http://127.0.0.1:8000` no navegador. A página permite enviar um CSV, visualizar a classificação estimada de cada linha, ordenar benignos ou malignos primeiro ou priorizar registros mais próximos do limite de decisão, e baixar um CSV de exemplo. A planilha deve ter as 30 colunas numéricas com os mesmos nomes usados na base; `id` e `diagnosis` são opcionais e ignorados. São aceitos arquivos de até 5 MB e 2.000 registros. A ordenação por proximidade não representa probabilidade: para o SVM, o score é uma medida de decisão, não um percentual de certeza.
+
+A API também disponibiliza a documentação interativa em `http://127.0.0.1:8000/docs`. O endpoint `POST /api/predict` recebe o arquivo no campo `file`; `GET /api/health` informa se o artefato do modelo está disponível. A interface mostra a probabilidade estimada para as classes benigna e maligna. A ordenação por proximidade de 50% usa a probabilidade estimada de malignidade; esses valores não são medidas de precisão ou certeza clínica. Após atualizar o código, execute `python main.py` novamente para exportar um modelo com estimativas de probabilidade antes de iniciar a API.
+
+Para executar a interface com Docker, primeiro monte o modelo no diretório local `results`, depois inicie o servidor:
+
+```powershell
+$resultsPath = (Resolve-Path .).Path + "\results"
+$resultsPath = (Resolve-Path .).Path + "\results"
+New-Item -ItemType Directory -Force -Path $resultsPath | Out-Null
+docker run --rm --mount "type=bind,source=$resultsPath,target=/app/results" cancer-mama
+docker run --rm -p 8000:8000 --mount "type=bind,source=$resultsPath,target=/app/results" cancer-mama python web.py --host 0.0.0.0
+```
+
+Abra `http://127.0.0.1:8000` no navegador. A aplicação é apenas uma demonstração acadêmica e não deve ser usada para decisões médicas.
 
 ### Gráficos desta execução
 

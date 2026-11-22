@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Classificação experimental | Câncer de mama</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033; --muted: #64748b; --paper: #fff; --canvas: #f3f6fa;
+      --line: #e2e8f0; --teal: #0f766e; --teal-pale: #ccfbf1;
+      --rose: #be123c; --rose-pale: #ffe4e6;
+      --shadow: 0 16px 40px rgba(15, 23, 42, .07);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 15px/1.55 Inter, system-ui, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+    .topbar { background: #111827; color: #e2e8f0; padding: 16px max(5vw, 22px); }
+    .topbar-inner { width: min(1120px, 100%); margin: auto; display: flex; justify-content: space-between; gap: 18px; align-items: center; }
+    .brand { font-weight: 800; letter-spacing: .04em; }
+    .brand span { color: #5eead4; }
+    .top-note { color: #a7b3c5; font-size: 13px; }
+    main { width: min(1120px, calc(100% - 36px)); margin: 42px auto 70px; }
+    .intro { max-width: 760px; margin-bottom: 26px; }
+    .eyebrow { color: var(--teal); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+    h1 { margin: 8px 0; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; letter-spacing: -.04em; }
+    .intro p, .subtle { color: var(--muted); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; align-items: start; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+    .upload { padding: 24px; }
+    .upload h2, .info h2 { margin: 0; font-size: 18px; }
+    .subtle { margin: 5px 0 18px; font-size: 13px; }
+    .dropzone { min-height: 215px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; border: 2px dashed #cbd5e1; border-radius: 13px; background: #f8fafc; transition: .18s; }
+    .dropzone.dragging { border-color: var(--teal); background: #f0fdfa; }
+    .upload-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: var(--teal-pale); color: var(--teal); font-size: 23px; }
+    .dropzone strong { margin-top: 12px; }
+    .dropzone p { margin: 4px 0 13px; color: var(--muted); font-size: 13px; }
+    .file-input { display: none; }
+    .button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; border: 0; border-radius: 9px; cursor: pointer; text-decoration: none; font-weight: 750; font-size: 13px; transition: .15s; }
+    .button-primary { background: var(--teal); color: white; }
+    .button-primary:hover { background: #115e59; }
+    .button-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .button-secondary { border: 1px solid var(--line); background: white; color: var(--ink); }
+    .button-secondary:hover { background: #f8fafc; }
+    .selected { display: none; margin-top: 12px; padding: 10px 12px; background: #f1f5f9; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+    .selected.visible { display: block; }
+    .actions { display: flex; gap: 10px; margin-top: 14px; }
+    .actions > * { flex: 1; }
+    .status { display: none; margin-top: 14px; padding: 11px 13px; border-radius: 9px; font-size: 13px; }
+    .status.visible { display: block; }
+    .status.error { background: var(--rose-pale); color: #9f1239; }
+    .status.loading { background: var(--teal-pale); color: #115e59; }
+    .info { padding: 22px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 10px; margin-top: 17px; }
+    .number { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: var(--teal-pale); color: var(--teal); font-weight: 800; }
+    .step strong { display: block; font-size: 13px; }
+    .step span:last-child { color: var(--muted); font-size: 12px; }
+    .warning { margin-top: 18px; padding: 13px; border: 1px solid #fed7aa; border-radius: 10px; background: #fff7ed; color: #9a3412; font-size: 12px; }
+    .results { display: none; margin-top: 26px; }
+    .results.visible { display: block; }
+    .results-title { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin: 0 2px 12px; }
+    .results-title h2 { margin: 0; font-size: 23px; }
+    .results-title span { color: var(--muted); font-size: 12px; }
+    .sort-control { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .sort-control select { min-height: 36px; padding: 0 30px 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; }
+    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 13px; }
+    .summary-card { padding: 17px; }
+    .summary-card small { color: var(--muted); }
+    .summary-card strong { display: block; margin-top: 4px; font-size: 27px; }
+    .benign strong { color: var(--teal); }
+    .malignant strong { color: var(--rose); }
+    .table-card { overflow: hidden; }
+    .table-wrap { max-height: 420px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th { position: sticky; top: 0; background: #f1f5f9; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    th, td { padding: 12px 15px; border-bottom: 1px solid var(--line); }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .badge.benign { background: var(--teal-pale); color: #115e59; }
+    .badge.malignant { background: var(--rose-pale); color: #9f1239; }
+    .probability { min-width: 180px; }
+    .probability-label { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .probability-label span:first-child { color: var(--teal); }
+    .probability-label span:last-child { color: var(--rose); text-align: right; }
+    .probability-bar { display: flex; height: 6px; margin-top: 5px; overflow: hidden; border-radius: 99px; background: var(--rose-pale); }
+    .probability-benign { background: #0f766e; }
+    .results-note, footer { color: var(--muted); font-size: 12px; text-align: center; }
+    .results-note { margin: 12px 0; }
+    footer { padding: 0 18px 28px; }
+    @media (max-width: 780px) {
+      .layout { grid-template-columns: 1fr; }
+      .topbar-inner { align-items: flex-start; flex-direction: column; gap: 3px; }
+    }
+    @media (max-width: 520px) {
+      main { width: calc(100% - 24px); margin-top: 28px; }
+      .upload { padding: 17px; }
+      .actions { flex-direction: column; }
+      .results-title { align-items: flex-start; flex-direction: column; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .summary-card:first-child { grid-column: 1 / -1; }
+      th, td { padding: 10px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner">
+    <div class="brand">FIAP <span>·</span> CÂNCER DE MAMA</div>
+    <div class="top-note">IA para Devs · Turma 13IADT · demonstração acadêmica</div>
+  </div></header>
+  <main>
+    <section class="intro">
+      <span class="eyebrow">Classificação experimental</span>
+      <h1>Explore os resultados de uma planilha.</h1>
+      <p>Envie um CSV com as 30 características numéricas e veja a classificação estimada para cada linha.</p>
+    </section>
+    <div class="layout">
+      <section class="card upload" aria-labelledby="upload-title">
+        <h2 id="upload-title">Enviar dados</h2>
+        <p class="subtle">CSV separado por vírgulas. As colunas devem usar os nomes esperados pelo modelo.</p>
+        <div class="dropzone" id="dropzone">
+          <div class="upload-icon" aria-hidden="true">⇧</div>
+          <strong>Arraste o arquivo CSV para cá</strong>
+          <p>ou escolha um arquivo do computador · máximo 5 MB e 2.000 linhas</p>
+          <button class="button button-secondary" id="choose-file" type="button">Selecionar CSV</button>
+          <input class="file-input" id="file-input" type="file" accept=".csv,text/csv">
+        </div>
+        <div class="selected" id="selected-file"></div>
+        <div class="actions">
+          <a class="button button-secondary" href="/api/template">Baixar CSV de exemplo</a>
+          <button class="button button-primary" id="analyze" type="button" disabled>Analisar arquivo</button>
+        </div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </section>
+      <aside class="card info">
+        <h2>Como usar</h2>
+        <div class="step"><span class="number">1</span><div><strong>Prepare o CSV</strong><span>Inclua as 30 características numéricas. `id` e `diagnosis`, se presentes, são ignorados.</span></div></div>
+        <div class="step"><span class="number">2</span><div><strong>Envie a planilha</strong><span>Cada linha representa um registro a classificar.</span></div></div>
+        <div class="step"><span class="number">3</span><div><strong>Consulte as estimativas</strong><span>Veja a quantidade e a classe prevista para cada linha.</span></div></div>
+        <div class="warning"><strong>Uso acadêmico somente.</strong> Esta demonstração não realiza diagnóstico, não substitui avaliação profissional e não deve orientar decisões de saúde.</div>
+      </aside>
+    </div>
+    <section class="results" id="results" aria-labelledby="results-title">
+      <div class="results-title">
+        <div><h2 id="results-title">Resumo das previsões</h2><span id="total-label"></span></div>
+        <label class="sort-control" for="classification-sort">Ordenar
+          <select id="classification-sort">
+            <option value="benign">Benignos primeiro</option>
+            <option value="malignant">Malignos primeiro</option>
+            <option value="uncertain">Mais próximos de 50%</option>
+            <option value="original">Ordem da planilha</option>
+          </select>
+        </label>
+      </div>
+      <div class="summary">
+        <article class="card summary-card"><small>Registros</small><strong id="total-count">0</strong></article>
+        <article class="card summary-card benign"><small>Classificados como benignos</small><strong id="benign-count">0</strong></article>
+        <article class="card summary-card malignant"><small>Classificados como malignos</small><strong id="malignant-count">0</strong></article>
+      </div>
+      <div class="card table-card"><div class="table-wrap">
+        <table><thead><tr><th>Registro / ID</th><th>Classificação estimada</th><th>Probabilidades estimadas</th></tr></thead><tbody id="results-body"></tbody></table>
+      </div></div>
+      <p class="results-note">As porcentagens são estimativas de probabilidade do modelo, não medidas de precisão ou certeza clínica. Registros próximos de 50% têm probabilidades estimadas mais equilibradas entre as classes.</p>
+    </section>
+  </main>
+  <footer>Classificador experimental · A decisão sobre saúde deve ser tomada por profissionais qualificados.</footer>
+  <script>
+    const fileInput = document.getElementById("file-input");
+    const dropzone = document.getElementById("dropzone");
+    const selectedFile = document.getElementById("selected-file");
+    const analyzeButton = document.getElementById("analyze");
+    const statusBox = document.getElementById("status");
+    const results = document.getElementById("results");
+    const resultsBody = document.getElementById("results-body");
+    const classificationSort = document.getElementById("classification-sort");
+    let activeFile = null;
+    let currentResults = [];
+
+    function showStatus(message, kind) {
+      statusBox.textContent = message;
+      statusBox.className = `status visible ${kind}`;
+    }
+    function chooseFile(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        activeFile = null;
+        selectedFile.classList.remove("visible");
+        analyzeButton.disabled = true;
+        showStatus("Escolha um arquivo com extensão .csv.", "error");
+        return;
+      }
+      activeFile = file;
+      selectedFile.textContent = `Arquivo selecionado: ${file.name}`;
+      selectedFile.classList.add("visible");
+      analyzeButton.disabled = false;
+      statusBox.className = "status";
+      results.classList.remove("visible");
+    }
+
+    function renderResultRows() {
+      const sortedResults = currentResults
+        .map((result, index) => ({ result, index }))
+        .sort((left, right) => {
+          const direction = classificationSort.value;
+          if (direction === "original") return left.index - right.index;
+          if (direction === "uncertain") {
+            const leftDistance = Math.abs(left.result.probability_malignant - 0.5);
+            const rightDistance = Math.abs(right.result.probability_malignant - 0.5);
+            return leftDistance - rightDistance || left.index - right.index;
+          }
+          const leftRank = left.result.diagnosis === "Benigno" ? 0 : 1;
+          const rightRank = right.result.diagnosis === "Benigno" ? 0 : 1;
+          const rankDifference = direction === "benign"
+            ? leftRank - rightRank
+            : rightRank - leftRank;
+          return rankDifference || left.index - right.index;
+        });
+
+      resultsBody.replaceChildren();
+      for (const { result } of sortedResults) {
+        const row = document.createElement("tr");
+        const idCell = document.createElement("td");
+        idCell.textContent = result.row;
+        const classCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.className = `badge ${result.diagnosis === "Benigno" ? "benign" : "malignant"}`;
+        badge.textContent = result.diagnosis;
+        classCell.append(badge);
+        const probabilityCell = document.createElement("td");
+        probabilityCell.className = "probability";
+        const probabilityLabel = document.createElement("div");
+        probabilityLabel.className = "probability-label";
+        const benignProbability = document.createElement("span");
+        benignProbability.textContent = `Benigno ${(result.probability_benign * 100).toFixed(1)}%`;
+        const malignantProbability = document.createElement("span");
+        malignantProbability.textContent = `Maligno ${(result.probability_malignant * 100).toFixed(1)}%`;
+        probabilityLabel.append(benignProbability, malignantProbability);
+        const probabilityBar = document.createElement("div");
+        probabilityBar.className = "probability-bar";
+        const benignBar = document.createElement("span");
+        benignBar.className = "probability-benign";
+        benignBar.style.width = `${Math.max(0, Math.min(100, result.probability_benign * 100))}%`;
+        probabilityBar.append(benignBar);
+        probabilityCell.append(probabilityLabel, probabilityBar);
+        row.append(idCell, classCell, probabilityCell);
+        resultsBody.append(row);
+      }
+    }
+
+    classificationSort.addEventListener("change", renderResultRows);
+    document.getElementById("choose-file").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => chooseFile(fileInput.files[0]));
+    for (const eventName of ["dragenter", "dragover"]) {
+      dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
+        dropzone.classList.add("dragging");
+      });
+    }
+    for (const eventName of ["dragleave", "drop"]) {
+      dropzone.addEventListener(eventName, event => {
+        event.preventDefault();
+        dropzone.classList.remove("dragging");
+      });
+    }
+    dropzone.addEventListener("drop", event => chooseFile(event.dataTransfer.files[0]));
+    analyzeButton.addEventListener("click", async () => {
+      if (!activeFile) return;
+      analyzeButton.disabled = true;
+      showStatus("Classificando os registros…", "loading");
+      const formData = new FormData();
+      formData.append("file", activeFile);
+      try {
+        const response = await fetch("/api/predict", { method: "POST", body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Não foi possível analisar o CSV.");
+        document.getElementById("total-count").textContent = data.total;
+        document.getElementById("benign-count").textContent = data.summary.benign;
+        document.getElementById("malignant-count").textContent = data.summary.malignant;
+        document.getElementById("total-label").textContent = `Modelo: ${data.model} · ${data.total} registro(s)`;
+        currentResults = data.results;
+        renderResultRows();
+        results.classList.add("visible");
+        results.scrollIntoView({ behavior: "smooth", block: "start" });
+        statusBox.className = "status";
+      } catch (error) {
+        showStatus(error.message || "Falha ao comunicar com a aplicação.", "error");
+      } finally {
+        analyzeButton.disabled = !activeFile;
+      }
+    });
+  </script>
+</body>
+</html>

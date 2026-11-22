@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 COPY predict.py .
+COPY web.py .
 COPY src ./src
 COPY data/breast_cancer.csv ./data/breast_cancer.csv
 
