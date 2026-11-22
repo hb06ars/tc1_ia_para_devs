@@ -1,5 +1,4 @@
 from src.cancer_de_mama.data_exploration.data_exploration import DataExploration
-from src.cancer_de_mama.final_adjustments.final_adjustments import FinalAdjustments
 from src.cancer_de_mama.model_training_and_evaluation.model_training_and_evaluation import ModelTrainingAndEvaluation
 from src.cancer_de_mama.modeling.modeling import Modeling
 from src.cancer_de_mama.preprocessing.preprocessing import Preprocessing
@@ -23,10 +22,7 @@ class BreastCancer:
         self.data_frame = Preprocessing(self.data_frame).execute()
 
         """ Modelagem """
-        Modeling(self.data_frame).execute()
+        modeling = Modeling(self.data_frame).execute()
 
         """ Treinamento e Avaliação do modelo """
-        ModelTrainingAndEvaluation().execute()
-
-        """ Ajustes Finais """
-        FinalAdjustments().execute()
+        ModelTrainingAndEvaluation(modeling).execute()
