@@ -126,29 +126,43 @@ Os gráficos abaixo ilustram a distribuição dos diagnósticos, os erros e acer
 
 ![Gráfico de distribuição dos diagnósticos benignos e malignos](./docs/images/distribuicao_diagnosticos.png)
 
+O gráfico mostra quantos registros existem em cada classe: **357 benignos (B)** e **212 malignos (M)**. Há mais exemplos benignos, então as classes não estão exatamente equilibradas. A estratificação usada nas divisões mantém proporções semelhantes entre treino, validação e teste. Este gráfico descreve a base; não mostra previsões do modelo.
+
 **Distribuição das características**
 
 ![Histogramas das características por diagnóstico](./docs/images/distribuicao_caracteristicas.png)
+
+Cada quadro mostra a distribuição de uma característica; o eixo horizontal representa seus valores e o vertical, a quantidade de registros. As cores distinguem diagnósticos benignos e malignos. Em algumas medidas, como raio, perímetro, área e pontos côncavos, as distribuições malignas aparecem deslocadas para valores maiores, embora haja sobreposição. Isso ajuda a visualizar padrões que podem ser úteis ao classificador, mas nenhuma característica isolada determina o diagnóstico.
 
 **Correlação entre as características**
 
 ![Matriz de correlação das características](./docs/images/matriz_correlacao.png)
 
+A matriz mostra a correlação linear entre cada par de características. Tons mais avermelhados indicam correlação positiva; azulados, negativa; cores próximas do centro da escala indicam correlação fraca. A diagonal vale 1 porque cada característica está perfeitamente correlacionada consigo mesma. Por exemplo, raio, perímetro e área apresentam correlações positivas fortes, pois medem aspectos relacionados do tamanho. A última linha/coluna compara as características com `diagnosis` (0 = benigno, 1 = maligno); correlação não significa causalidade.
+
 **Matriz de confusão no conjunto de teste**
 
 ![Matriz de confusão do SVM no teste](./docs/images/matriz_confusao_teste.png)
+
+As linhas representam o diagnóstico real e as colunas, o previsto. Os valores na diagonal são acertos: **50 benignos** e **32 malignos**. Fora da diagonal estão os erros: **4 benignos classificados como malignos** (falsos positivos) e **nenhum maligno classificado como benigno** (falsos negativos) neste conjunto de teste. O resultado corresponde a 95,3% de acurácia e 100% de recall maligno nesta divisão, mas não garante o mesmo desempenho em outros dados.
 
 **Importância por permutação para o recall maligno**
 
 ![Importância das características por permutação](./docs/images/importancia_caracteristicas.png)
 
+O método embaralha uma característica de cada vez e mede quanto o recall maligno diminui. Uma barra maior indica que, nesta avaliação, o embaralhamento daquela característica prejudicou mais o recall. Neste gráfico, `texture_worst` teve a maior queda média, cerca de **0,003**; as demais ficaram próximas de zero. Isso não prova que só essa característica seja útil: medidas correlacionadas podem carregar informação semelhante, e a importância varia conforme os dados e o modelo. O gráfico mede influência na métrica escolhida, não causalidade.
+
 **SHAP — contribuição das características nas previsões**
 
 ![Gráfico SHAP beeswarm](./docs/images/shap_beeswarm.png)
 
+Cada ponto representa um registro e cada linha, uma característica. A posição horizontal é o valor SHAP: pontos à direita aumentam o score de malignidade do modelo; à esquerda, diminuem. A cor indica o valor da característica naquele registro — azul baixo, rosa alto — e o espalhamento vertical ajuda a visualizar onde há mais pontos. Por exemplo, valores altos de `texture_worst` aparecem em alguns registros com contribuição positiva. O gráfico explica as contribuições para as previsões analisadas, não causas médicas.
+
 **SHAP — importância global**
 
 ![Importância global das características segundo SHAP](./docs/images/shap_importance.png)
+
+Este gráfico resume, para cada característica, a magnitude média das contribuições SHAP nos registros analisados; barras maiores indicam maior influência média no score. Aqui, `symmetry_worst` e `texture_worst` aparecem entre as características com maior influência global. Diferentemente do beeswarm, este resumo não mostra se a influência aumenta ou diminui o score, nem representa uma porcentagem de precisão. A importância é relativa a este modelo e aos exemplos avaliados.
 
 ## Execução local
 
