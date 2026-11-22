@@ -1,0 +1,9 @@
+.git
+.idea
+.venv
+.venv_validation
+venv
+__pycache__
+*.py[cod]
+results
+*.ipynb
