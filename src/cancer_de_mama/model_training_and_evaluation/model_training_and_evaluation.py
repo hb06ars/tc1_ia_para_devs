@@ -43,17 +43,16 @@ class ModelTrainingAndEvaluation:
     def execute(self, modeling=None):
         print("\n--------- Treinamento e Avaliação do modelo ----------------------------------------\n")
 
-        """ Validação de modelo not null e criação de diretório se necessário."""
+        """ Confere se a modelagem existe e prepara as pastas de resultados."""
         self.validation_exists_modeling_and_dir(modeling)
 
-        """ Compara os modelos com validação cruzada estratificada de 5 partes. """
+        """ Compara os modelos em cinco divisões dos dados."""
         self.cross_validation_results = self.cross_validate_models()
 
-        """ Escolhe o modelo pela validação cruzada e calibra seu limiar. """
+        """ Escolhe o melhor modelo, pela validação cruzada, e o limiar de classificação."""
         self.select_model_and_refit()
 
-        """ Avalia o modelo escolhido no conjunto de teste e calcula as métricas finais 
-            Gerando: (Feature importance, Matriz de Confusão, etc). """
+        """ Mede o resultado final usando os dados de teste."""
         self.test_metrics = self.evaluate_on_test()
 
         """ Feature Importance: Mostra quais características ajudam mais a identificar casos malignos. """
@@ -62,23 +61,23 @@ class ModelTrainingAndEvaluation:
         """ SHAP: Cria gráficos para mostrar quais características influenciaram as previsões."""
         self.run_shap_analysis()
 
-        """ Discussão dos resultados finais."""
+        """Apresenta os cuidados ao interpretar os resultados."""
         self.discuss_results()
 
         return self
 
     def validation_exists_modeling_and_dir(self, modeling):
-        """ Validando modeling"""
+        """Confere se os modelos foram preparados."""
         self.modeling = modeling if modeling is not None else self.modeling
         if self.modeling is None or not self.modeling.models:
             raise ValueError("Execute a etapa de modelagem antes da avaliação.")
 
-        """ Validando diretório"""
+        """Cria as pastas para salvar tabelas e gráficos."""
         self.graphics_dir.mkdir(parents=True, exist_ok=True)
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
 
     def cross_validate_models(self):
-        """Compara os modelos em cinco rodadas usando apenas os dados de desenvolvimento."""
+        """Compara os modelos em cinco rodadas, sem usar o teste final."""
         results = []
         print("=== VALIDAÇÃO CRUZADA ESTRATIFICADA (5 PARTES) ===")
 
@@ -140,20 +139,28 @@ class ModelTrainingAndEvaluation:
                 y_development,
                 threshold_predictions,
             )
+            threshold_f2 = fbeta_score(
+                y_development,
+                threshold_predictions,
+                beta=self.RECALL_BETA,
+                pos_label=self.POSITIVE_CLASS,
+                zero_division=0,
+            )
             metrics.update(
                 {
                     f"oof_{metric}": value
                     for metric, value in threshold_metrics.items()
                 }
             )
+            metrics["oof_f2_score"] = threshold_f2
             metrics["model"] = name
             metrics["threshold"] = threshold
             results.append(metrics)
 
-        # A escolha prioriza a média do recall nas cinco partes; os demais critérios
-        # ajudam no desempate e a precision mostra a frequência de falsos positivos.
+        # O F2 dá mais peso a encontrar os casos malignos.
+        # As outras métricas ajudam a desempatar os modelos.
         results_frame = pd.DataFrame(results).sort_values(
-            by=["recall_mean", "precision_mean", "f1_score_mean", "accuracy_mean"],
+            by=["oof_f2_score", "oof_recall", "oof_precision", "oof_f1_score"],
             ascending=False,
         )
 
@@ -164,21 +171,24 @@ class ModelTrainingAndEvaluation:
 
         print(results_frame.to_string(index=False, float_format=lambda value: f"{value:.3f}"))
         print(
-            "\nAs métricas *_mean e *_std resumem os cinco folds. "
-            "O limiar é calibrado pelas previsões fora do fold, priorizando recall "
-            "com F2-score (recall tem peso maior que precision)."
+            "\n*_mean e *_std mostram a média e a variação entre as cinco rodadas. "
+            "oof_* mostra os resultados com o limiar ajustado. A escolha prioriza "
+            "oof_f2_score, que dá mais peso a identificar casos malignos."
         )
         return results_frame
 
     def select_model_and_refit(self):
-        """Escolhe o modelo pela validação cruzada e treina com todos os dados de desenvolvimento.
-        'Prioriza recall maligno': quer dizer que, ao escolher o limiar,
-        damos mais importância a identificar o maior número possível de casos que realmente são malignos.
+        """Escolhe o melhor modelo e treina-o com os dados de desenvolvimento."""
 
-        Isso reduz a chance de o modelo classificar um caso maligno como benigno — um falso negativo —
-        mas pode aumentar os falsos positivos, isto é, casos benignos sinalizados como malignos.
-        Por isso, “priorizar” não significa garantir que falsos negativos não acontecerão.
+        """ Escolhe o modelo pela validação cruzada (best_result).
+            'Prioriza recall maligno': quer dizer que, ao escolher o limiar,
+            damos mais importância a identificar o maior número possível de casos que realmente são malignos.
+        
+            Isso reduz a chance de o modelo classificar um caso maligno como benigno — um falso negativo —
+            mas pode aumentar os falsos positivos, isto é, casos benignos sinalizados como malignos.
+            Por isso, “priorizar” não significa garantir que falsos negativos não acontecerão.
         """
+
 
         best_result = self.cross_validation_results.iloc[0]
         self.selected_model_name = best_result["model"]
@@ -256,7 +266,7 @@ class ModelTrainingAndEvaluation:
         }
 
     def get_positive_class_scores(self, model, features):
-        """Obtém um score para a classe maligna, seja probabilidade ou margem do SVM."""
+        """Obtém o valor usado pelo modelo para decidir se o caso é maligno."""
         if hasattr(model, "predict_proba"):
             return model.predict_proba(features)[:, 1]
         return model.decision_function(features)
@@ -266,7 +276,7 @@ class ModelTrainingAndEvaluation:
         return (scores >= threshold).astype(int)
 
     def find_recall_focused_threshold(self, scores, labels):
-        """Escolhe o limiar pelo F2-score, que dá mais peso ao recall."""
+        """Escolhe um limiar que favorece identificar casos malignos."""
         best_threshold = None
         best_predictions = None
         best_metrics = None
@@ -327,8 +337,8 @@ class ModelTrainingAndEvaluation:
 
         importance = permutation_importance(
             self.final_model,
-            self.modeling.X_test,
-            self.modeling.y_test,
+            self.modeling.X_validation,
+            self.modeling.y_validation,
             scoring=recall_at_selected_threshold,
             n_repeats=10,
             random_state=self.RANDOM_STATE,
@@ -360,12 +370,12 @@ class ModelTrainingAndEvaluation:
 
     def run_shap_analysis(self):
         """Cria gráficos (SHAP) para mostrar quais características influenciaram as previsões."""
-        feature_names = self.modeling.X_test.columns
+        feature_names = self.modeling.X_validation.columns
         background = self.modeling.X_train.sample(
             n=min(30, len(self.modeling.X_train)),
             random_state=self.RANDOM_STATE,
         )
-        examples = self.modeling.X_test.head(30)
+        examples = self.modeling.X_validation.head(30)
 
         def model_score(values):
             values_frame = pd.DataFrame(values, columns=feature_names)
