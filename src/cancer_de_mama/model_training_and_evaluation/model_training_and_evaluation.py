@@ -46,16 +46,14 @@ class ModelTrainingAndEvaluation:
         """ Validação de modelo not null e criação de diretório se necessário."""
         self.validation_exists_modeling_and_dir(modeling)
 
-        """Compara os modelos com validação cruzada estratificada de 5 partes."""
+        """ Compara os modelos com validação cruzada estratificada de 5 partes. """
         self.cross_validation_results = self.cross_validate_models()
 
-        """Escolhe o modelo pela validação cruzada e calibra seu limiar."""
+        """ Escolhe o modelo pela validação cruzada e calibra seu limiar. """
         self.select_model_and_refit()
 
-        """ Calcula as métricas finais no teste, que não participa da seleção do modelo.
-            Assim, o teste dá uma estimativa mais imparcial de como o modelo pode se sair 
-            dos dados usados para desenvolvê-lo.
-        """
+        """ Avalia o modelo escolhido no conjunto de teste e calcula as métricas finais 
+            Gerando: (Feature importance, Matriz de Confusão, etc). """
         self.test_metrics = self.evaluate_on_test()
 
         """ Feature Importance: Mostra quais características ajudam mais a identificar casos malignos. """
@@ -173,7 +171,15 @@ class ModelTrainingAndEvaluation:
         return results_frame
 
     def select_model_and_refit(self):
-        """Escolhe o modelo pela validação cruzada e treina com todos os dados de desenvolvimento."""
+        """Escolhe o modelo pela validação cruzada e treina com todos os dados de desenvolvimento.
+        'Prioriza recall maligno': quer dizer que, ao escolher o limiar,
+        damos mais importância a identificar o maior número possível de casos que realmente são malignos.
+
+        Isso reduz a chance de o modelo classificar um caso maligno como benigno — um falso negativo —
+        mas pode aumentar os falsos positivos, isto é, casos benignos sinalizados como malignos.
+        Por isso, “priorizar” não significa garantir que falsos negativos não acontecerão.
+        """
+
         best_result = self.cross_validation_results.iloc[0]
         self.selected_model_name = best_result["model"]
         self.final_model = clone(self.modeling.models[self.selected_model_name])
@@ -195,11 +201,7 @@ class ModelTrainingAndEvaluation:
         print(f"Modelo final treinado com {len(X_development)} registros de desenvolvimento.")
 
     def evaluate_on_test(self):
-        """
-            Calcula as métricas finais no teste, que não participa da seleção do modelo.
-            Assim, o teste dá uma estimativa mais imparcial de como o modelo pode se sair fora
-            dos dados usados para desenvolvê-lo.
-        """
+        """Avalia o modelo escolhido no conjunto de teste e calcula as métricas finais (Feature importance, Matriz de Confusão, etc)."""
 
         y_true = self.modeling.y_test
         predictions = self.predict_with_threshold(
