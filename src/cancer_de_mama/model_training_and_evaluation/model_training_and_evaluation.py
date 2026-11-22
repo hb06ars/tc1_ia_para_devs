@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import shap
@@ -10,10 +11,12 @@ from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
+    fbeta_score,
     f1_score,
     precision_score,
     recall_score,
 )
+from sklearn.model_selection import StratifiedKFold
 
 
 class ModelTrainingAndEvaluation:
@@ -23,6 +26,7 @@ class ModelTrainingAndEvaluation:
     """
 
     POSITIVE_CLASS = 1
+    RECALL_BETA = 2
     RANDOM_STATE = 42
 
     def __init__(self, modeling=None, output_dir="results"):
@@ -32,7 +36,8 @@ class ModelTrainingAndEvaluation:
         self.metrics_dir = self.output_dir / "metrics"
         self.selected_model_name = None
         self.final_model = None
-        self.validation_results = None
+        self.selected_threshold = None
+        self.cross_validation_results = None
         self.test_metrics = None
 
     def execute(self, modeling=None):
@@ -41,15 +46,11 @@ class ModelTrainingAndEvaluation:
         """ Validação de modelo not null e criação de diretório se necessário."""
         self.validation_exists_modeling_and_dir(modeling)
 
-        """ Treina cada candidato, no teste de validação (candidato = tipo de modelo: Regressão Logística, SVM, Árvore de Decisão) 
-            e compara os seus resultados. """
-        self.validation_results = self.train_and_compare_on_validation()
+        """Compara os modelos com validação cruzada estratificada de 5 partes."""
+        self.cross_validation_results = self.cross_validate_models()
 
-        """ Pega o 'best' (melhor no teste de validação foi usada para escolher o melhor modelo).
-            No nosso caso, foi Regressao Logística e 're-treina'. 
-            Assim, o modelo final aprende com mais exemplos.
-        """
-        self.select_and_refit_model()
+        """Escolhe o modelo pela validação cruzada e calibra seu limiar."""
+        self.select_model_and_refit()
 
         """ Calcula as métricas finais no teste, que não participa da seleção do modelo.
             Assim, o teste dá uma estimativa mais imparcial de como o modelo pode se sair 
@@ -78,70 +79,120 @@ class ModelTrainingAndEvaluation:
         self.graphics_dir.mkdir(parents=True, exist_ok=True)
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
 
-    def train_and_compare_on_validation(self):
+    def cross_validate_models(self):
+        """Compara os modelos em cinco rodadas usando apenas os dados de desenvolvimento."""
         results = []
-        print("=== Treino e comparação na validação ===")
+        print("=== VALIDAÇÃO CRUZADA ESTRATIFICADA (5 PARTES) ===")
 
-        """ 
-            Cada modelo aprende padrões usando somente os dados de treino.
-            Em seguida, predictions guarda as classes previstas (resultados corretos previstos) para os dados de validação.
-            
-            calculate_metrics compara essas previsões com os diagnósticos reais da validação:
-                - accuracy: proporção total de previsões corretas, entre benignos e malignos.
-                - precision: entre os casos previstos como malignos, quantos realmente são malignos.
-                - recall: entre os casos realmente malignos, quantos foram identificados pelo modelo.
-                
-                - f1_score: equilíbrio entre precision e recall, útil quando os dois importam.
-                    Exemplo: suponha que o modelo identifique 10 casos como malignos, e 8 realmente sejam malignos (precision = 80%). 
-                    Mas havia 20 casos malignos no total, então ele encontrou apenas 8 (recall = 40%). 
-                    O F1-score será cerca de 53%, refletindo que o modelo foi bem em precision, mas deixou passar vários casos malignos.
-            """
-        for name, model in self.modeling.models.items():
-            model.fit(self.modeling.X_train, self.modeling.y_train)
-            predictions = model.predict(self.modeling.X_validation)
-            metrics = self.calculate_metrics(self.modeling.y_validation, predictions)
-            metrics["model"] = name
-            results.append(metrics)
-
-        """
-            Ordena os modelos do maior para o menor recall; em caso de empate,
-            usa F1-score e accuracy como critérios seguintes. 
-            Depois, salva e exibe a comparação.
-            Priorizamos o recall maligno porque casos malignos não identificados (falsos negativos)
-            podem atrasar a investigação. Falsos positivos também têm consequências e podem
-            levar a exames adicionais; a previsão do modelo não substitui a avaliação médica.
-        """
-        results_frame = pd.DataFrame(results).sort_values(
-            by=["recall", "f1_score", "accuracy"],
-            ascending=False,
-        )
-
-        results_frame.to_csv(self.metrics_dir / "comparacao_modelos_validacao.csv", index=False)
-
-        print(results_frame.to_string(index=False, float_format=lambda value: f"{value:.3f}"))
-        print(
-            "\nA seleção prioriza o recall da classe maligna: quanto maior, "
-            "menor a proporção de casos malignos que o modelo deixa passar."
-        )
-        return results_frame
-
-    def select_and_refit_model(self):
-        """ Pega o melhor treino e 'retreina' """
-        best_result = self.validation_results.iloc[0]
-        self.selected_model_name = best_result["model"]
-        self.final_model = clone(self.modeling.models[self.selected_model_name])
-
-        X_train_validation = pd.concat(
+        X_development = pd.concat(
             [self.modeling.X_train, self.modeling.X_validation],
             ignore_index=True,
         )
-        y_train_validation = pd.concat(
+        y_development = pd.concat(
             [self.modeling.y_train, self.modeling.y_validation],
             ignore_index=True,
         )
-        self.final_model.fit(X_train_validation, y_train_validation)
+        cross_validator = StratifiedKFold(
+            n_splits=5,
+            shuffle=True,
+            random_state=self.RANDOM_STATE,
+        )
+
+        for name, model in self.modeling.models.items():
+            fold_metrics = []
+            out_of_fold_scores = np.empty(len(X_development))
+
+            for train_indices, validation_indices in cross_validator.split(
+                X_development,
+                y_development,
+            ):
+                fold_model = clone(model)
+                X_fold_train = X_development.iloc[train_indices]
+                y_fold_train = y_development.iloc[train_indices]
+                X_fold_validation = X_development.iloc[validation_indices]
+                y_fold_validation = y_development.iloc[validation_indices]
+
+                fold_model.fit(X_fold_train, y_fold_train)
+                fold_predictions = fold_model.predict(X_fold_validation)
+                fold_metrics.append(
+                    self.calculate_metrics(y_fold_validation, fold_predictions)
+                )
+                out_of_fold_scores[validation_indices] = self.get_positive_class_scores(
+                    fold_model,
+                    X_fold_validation,
+                )
+
+            fold_metrics_frame = pd.DataFrame(fold_metrics)
+            metrics = {
+                f"{metric}_mean": fold_metrics_frame[metric].mean()
+                for metric in ("accuracy", "precision", "recall", "f1_score")
+            }
+            metrics.update(
+                {
+                    f"{metric}_std": fold_metrics_frame[metric].std(ddof=0)
+                    for metric in ("accuracy", "precision", "recall", "f1_score")
+                }
+            )
+
+            threshold, threshold_predictions = self.find_recall_focused_threshold(
+                out_of_fold_scores,
+                y_development,
+            )
+            threshold_metrics = self.calculate_metrics(
+                y_development,
+                threshold_predictions,
+            )
+            metrics.update(
+                {
+                    f"oof_{metric}": value
+                    for metric, value in threshold_metrics.items()
+                }
+            )
+            metrics["model"] = name
+            metrics["threshold"] = threshold
+            results.append(metrics)
+
+        # A escolha prioriza a média do recall nas cinco partes; os demais critérios
+        # ajudam no desempate e a precision mostra a frequência de falsos positivos.
+        results_frame = pd.DataFrame(results).sort_values(
+            by=["recall_mean", "precision_mean", "f1_score_mean", "accuracy_mean"],
+            ascending=False,
+        )
+
+        results_frame.to_csv(
+            self.metrics_dir / "comparacao_modelos_validacao_cruzada.csv",
+            index=False,
+        )
+
+        print(results_frame.to_string(index=False, float_format=lambda value: f"{value:.3f}"))
+        print(
+            "\nAs métricas *_mean e *_std resumem os cinco folds. "
+            "O limiar é calibrado pelas previsões fora do fold, priorizando recall "
+            "com F2-score (recall tem peso maior que precision)."
+        )
+        return results_frame
+
+    def select_model_and_refit(self):
+        """Escolhe o modelo pela validação cruzada e treina com todos os dados de desenvolvimento."""
+        best_result = self.cross_validation_results.iloc[0]
+        self.selected_model_name = best_result["model"]
+        self.final_model = clone(self.modeling.models[self.selected_model_name])
+        self.selected_threshold = best_result["threshold"]
+        X_development = pd.concat(
+            [self.modeling.X_train, self.modeling.X_validation],
+            ignore_index=True,
+        )
+        y_development = pd.concat(
+            [self.modeling.y_train, self.modeling.y_validation],
+            ignore_index=True,
+        )
+        self.final_model.fit(X_development, y_development)
         print(f"\nModelo selecionado pela validação: {self.selected_model_name}")
-        print(f"Foi treinado novamente com {len(X_train_validation)} registros de treino + validação.")
+        print(
+            f"Limiar escolhido pelo F{self.RECALL_BETA}-score "
+            f"(prioriza recall maligno): {self.selected_threshold:.4f}"
+        )
+        print(f"Modelo final treinado com {len(X_development)} registros de desenvolvimento.")
 
     def evaluate_on_test(self):
         """
@@ -151,34 +202,18 @@ class ModelTrainingAndEvaluation:
         """
 
         y_true = self.modeling.y_test
-        predictions = self.final_model.predict(self.modeling.X_test)
+        predictions = self.predict_with_threshold(
+            self.final_model,
+            self.modeling.X_test,
+            self.selected_threshold,
+        )
         metrics = self.calculate_metrics(y_true, predictions)
         metrics["model"] = self.selected_model_name
+        metrics["threshold"] = self.selected_threshold
 
         print(f"\n======================================= AVALIAÇÃO FINAL NO TESTE =======================================")
         print(f"Teste final com : {self.selected_model_name}")
 
-        """ 
-        • Benigno: 
-                havia 54 casos. 
-                recall = 1,00 indica que o modelo identificou todos como benignos.
-                precision = 0,98 indica que, entre os casos previstos como benignos, cerca de 98% eram realmente benignos.
-                
-        • Maligno: 
-                havia 32 casos. 
-                recall = 0,97 indica que o modelo identificou 31 dos 32 casos malignos e deixou 1 passar. 
-                precision = 1,00 indica que todos os casos que previu como malignos eram realmente malignos.
-                
-        • F1-score: 
-            combina precision e recall em uma medida. É alto quando as duas métricas também são altas.
-        
-        • Accuracy = 0,99: o modelo acertou 85 dos 86 casos, aproximadamente 98,8%.
-        
-        • Macro avg: média simples das métricas das duas classes, dando o mesmo peso a benigno e maligno.
-        
-        • Weighted avg: média que considera quantos casos havia em cada classe; 
-            aqui, dá mais peso aos 54 casos benignos do que aos 32 malignos.
-        """
         for metric in ("accuracy", "precision", "recall", "f1_score"):
             print(f"{metric}: {metrics[metric]:.3f}")
         print("\nRelatório por diagnóstico (1 = maligno):")
@@ -218,6 +253,45 @@ class ModelTrainingAndEvaluation:
             ),
         }
 
+    def get_positive_class_scores(self, model, features):
+        """Obtém um score para a classe maligna, seja probabilidade ou margem do SVM."""
+        if hasattr(model, "predict_proba"):
+            return model.predict_proba(features)[:, 1]
+        return model.decision_function(features)
+
+    def predict_with_threshold(self, model, features, threshold):
+        scores = self.get_positive_class_scores(model, features)
+        return (scores >= threshold).astype(int)
+
+    def find_recall_focused_threshold(self, scores, labels):
+        """Escolhe o limiar pelo F2-score, que dá mais peso ao recall."""
+        best_threshold = None
+        best_predictions = None
+        best_metrics = None
+
+        for threshold in np.unique(scores):
+            predictions = (scores >= threshold).astype(int)
+            metrics = self.calculate_metrics(labels, predictions)
+            rank = (
+                fbeta_score(
+                    labels,
+                    predictions,
+                    beta=self.RECALL_BETA,
+                    pos_label=self.POSITIVE_CLASS,
+                    zero_division=0,
+                ),
+                metrics["recall"],
+                metrics["precision"],
+                metrics["f1_score"],
+                threshold,
+            )
+            if best_metrics is None or rank > best_metrics:
+                best_threshold = threshold
+                best_predictions = predictions
+                best_metrics = rank
+
+        return best_threshold, best_predictions
+
     def plot_confusion_matrix(self, y_true, predictions):
         """ Matriz de Confusão"""
 
@@ -241,11 +315,19 @@ class ModelTrainingAndEvaluation:
     def analyze_feature_importance(self):
         """ Feature Importance: Mostra quais características ajudam mais a identificar casos malignos. """
 
+        def recall_at_selected_threshold(model, features, labels):
+            predictions = self.predict_with_threshold(
+                model,
+                features,
+                self.selected_threshold,
+            )
+            return recall_score(labels, predictions, pos_label=self.POSITIVE_CLASS, zero_division=0)
+
         importance = permutation_importance(
             self.final_model,
             self.modeling.X_test,
             self.modeling.y_test,
-            scoring="recall",
+            scoring=recall_at_selected_threshold,
             n_repeats=10,
             random_state=self.RANDOM_STATE,
         )
@@ -322,7 +404,7 @@ class ModelTrainingAndEvaluation:
             "recall e precisão, enquanto accuracy mostra a proporção geral de acertos."
         )
         print(
-            "Limitação: estes resultados vêm de uma única divisão do dataset e não "
-            "demonstram segurança clínica. O modelo é apenas apoio à análise; não "
-            "substitui exames, avaliação profissional ou a decisão do médico."
+            "Limitação: a validação cruzada e o teste usam apenas este dataset e não "
+            "demonstram segurança clínica em pacientes reais. O modelo é apenas apoio "
+            "à análise; não substitui exames, avaliação profissional ou a decisão do médico."
         )
