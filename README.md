@@ -1,3 +1,17 @@
+# TECH CHALLENGE 1 - IA PARA DEV´s
+
+### **Turma:** 13IADT
+
+## Participantes:
+
+| Participante | RM |
+|---|---|
+| Douglas Wilson da Luz Dorigon | - |
+| Edigar Pierott Torres | - |
+| Eduardo Alves de Oliveira | RM374195 |
+| José Henrique Siqueira Brandão | RM379302 |
+| Ricardo dos Reis Xavier Santana | RM379133 |
+
 # Classificação de câncer de mama
 
 Projeto acadêmico de classificação binária com a base de câncer de mama do Tech Challenge. O programa compara Regressão Logística, SVM e Árvore de Decisão. A CNN será desenvolvida separadamente em um notebook e não faz parte da execução deste projeto.
