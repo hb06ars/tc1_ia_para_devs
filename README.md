@@ -74,6 +74,38 @@ Na execução avaliada, a validação cruzada selecionou o SVM. No teste separad
 
 O resultado foi accuracy de **95,3%**, precision maligna de **88,9%**, recall maligno de **100%** e F1-score de **94,1%**. Ou seja, nesse teste, 4 casos benignos foram sinalizados como malignos e nenhum caso maligno foi classificado como benigno. O resultado é específico a esta divisão e não garante o mesmo desempenho em novos dados.
 
+### Gráficos desta execução
+
+Os gráficos abaixo ilustram a distribuição dos diagnósticos, os erros e acertos do modelo e as análises de importância e SHAP. São resultados deste experimento acadêmico, não evidência de desempenho clínico.
+
+**Distribuição dos diagnósticos**
+
+![Gráfico de distribuição dos diagnósticos benignos e malignos](./docs/images/distribuicao_diagnosticos.png)
+
+**Distribuição das características**
+
+![Histogramas das características por diagnóstico](./docs/images/distribuicao_caracteristicas.png)
+
+**Correlação entre as características**
+
+![Matriz de correlação das características](./docs/images/matriz_correlacao.png)
+
+**Matriz de confusão no conjunto de teste**
+
+![Matriz de confusão do SVM no teste](./docs/images/matriz_confusao_teste.png)
+
+**Importância por permutação para o recall maligno**
+
+![Importância das características por permutação](./docs/images/importancia_caracteristicas.png)
+
+**SHAP — contribuição das características nas previsões**
+
+![Gráfico SHAP beeswarm](./docs/images/shap_beeswarm.png)
+
+**SHAP — importância global**
+
+![Importância global das características segundo SHAP](./docs/images/shap_importance.png)
+
 ## Execução local
 
 Requisitos: Python 3.12 e `pip`.
