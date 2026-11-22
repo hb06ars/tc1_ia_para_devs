@@ -190,6 +190,10 @@ docker run --rm --mount "type=bind,source=$resultsPath,target=/app/results" canc
 
 O volume mantém os resultados no diretório `results` do computador após o contêiner terminar.
 
+## Notebook Jupyter / Google Colab
+O arquivo `cancer_de_mama_colab.ipynb` executa exploração, pré-processamento, divisão dos dados, validação cruzada e avaliação final, incluindo importância por permutação e SHAP. Ele termina após as análises e **não exporta o modelo**. Abra-o no Jupyter ou envie-o ao Google Colab e execute as células em ordem. No Colab, envie `breast_cancer.csv` quando solicitado; localmente, o notebook procura `data/breast_cancer.csv`.
+
+
 ## Arquivos gerados
 
 Os resultados ficam em `results/`:
