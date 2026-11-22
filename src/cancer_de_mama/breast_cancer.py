@@ -23,7 +23,7 @@ class BreastCancer:
         self.data_frame = Preprocessing(self.data_frame).execute()
 
         """ Modelagem """
-        Modeling().execute()
+        Modeling(self.data_frame).execute()
 
         """ Treinamento e Avaliação do modelo """
         ModelTrainingAndEvaluation().execute()
