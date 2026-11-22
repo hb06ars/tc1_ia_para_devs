@@ -74,6 +74,26 @@ Na execução avaliada, a validação cruzada selecionou o SVM. No teste separad
 
 O resultado foi accuracy de **95,3%**, precision maligna de **88,9%**, recall maligno de **100%** e F1-score de **94,1%**. Ou seja, nesse teste, 4 casos benignos foram sinalizados como malignos e nenhum caso maligno foi classificado como benigno. O resultado é específico a esta divisão e não garante o mesmo desempenho em novos dados.
 
+## Fazer uma previsão com valores informados
+
+Ao executar `python main.py`, o modelo selecionado é exportado pela etapa `ExportBreastCancer` para `results/breast_cancer_model.joblib`. Depois, rode:
+
+```powershell
+python predict.py
+```
+
+O programa solicitará, uma por vez, as 30 características esperadas pelo modelo e exibirá a classificação **Benigno** ou **Maligno**. São aceitos ponto ou vírgula como separador decimal. Os valores precisam corresponder às mesmas características e unidades da base `data/breast_cancer.csv`; o programa rejeita entradas que não sejam numéricas ou estejam ausentes.
+
+Para usar o fluxo interativo com Docker após montar `results` como indicado abaixo:
+
+```powershell
+docker run --rm -it --mount "type=bind,source=$resultsPath,target=/app/results" cancer-mama python predict.py
+```
+
+Para utilizar a previsão em outro código Python, importe `BreastCancerPredictor` de `src.cancer_de_mama.prediction.breast_cancer_predictor` e chame `predict_one()` com um dicionário contendo os nomes e valores das 30 características.
+
+O SVM retorna um score de decisão, não uma probabilidade clínica. Esta previsão é uma demonstração acadêmica; não deve ser usada para diagnosticar ou orientar tratamento.
+
 ### Gráficos desta execução
 
 Os gráficos abaixo ilustram a distribuição dos diagnósticos, os erros e acertos do modelo e as análises de importância e SHAP. São resultados deste experimento acadêmico, não evidência de desempenho clínico.
@@ -154,6 +174,7 @@ Os resultados ficam em `results/`:
 - `matriz_correlacao.csv` e `graphics/matriz_correlacao.png`: correlações entre as colunas.
 - `metrics/comparacao_modelos_validacao_cruzada.csv`: comparação dos modelos nos cinco folds e métricas *out-of-fold*.
 - `metrics/metricas_teste.csv`: métricas finais no teste separado.
+- `breast_cancer_model.joblib`: modelo selecionado e limiar usado pelo programa `predict.py`.
 - `metrics/importancia_caracteristicas.csv` e `graphics/importancia_caracteristicas.png`: importância por permutação.
 - `graphics/matriz_confusao_teste.png`, `graphics/shap_beeswarm.png` e `graphics/shap_importance.png`: visualizações da avaliação e explicabilidade.
 
