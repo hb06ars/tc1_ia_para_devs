@@ -46,7 +46,7 @@ class ModelTrainingAndEvaluation:
         """ Confere se a modelagem existe e prepara as pastas de resultados."""
         self.validation_exists_modeling_and_dir(modeling)
 
-        """ Compara os modelos em cinco divisões dos dados."""
+        """ Validação Cruzada - Compara os modelos em cinco divisões dos dados."""
         self.cross_validation_results = self.cross_validate_models()
 
         """ Escolhe o melhor modelo, pela validação cruzada, e o limiar de classificação."""
