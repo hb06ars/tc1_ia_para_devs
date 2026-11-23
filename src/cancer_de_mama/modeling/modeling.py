@@ -60,11 +60,12 @@ class Modeling:
         print("Modelos definidos: " + ", ".join(self.models))
 
     def save_models_and_pipelines(self):
-        # Regressão Logística: modelo inicial para o problema binário (benigno ou maligno)
-        # Serve como referência para comparar os demais modelos e pode estimar
-        # a probabilidade de cada classe. A padronização coloca as medidas
-        # em escalas semelhantes, o que ajuda o modelo a aprender com elas.
         self.models = {
+
+            # Regressão Logística: modelo inicial para o problema binário (benigno ou maligno)
+            # Serve como referência para comparar os demais modelos e pode estimar
+            # a probabilidade de cada classe. A padronização coloca as medidas
+            # em escalas semelhantes, o que ajuda o modelo a aprender com elas.
             "Regressão Logística": Pipeline(
                 steps=[
                     ("imputer", SimpleImputer(strategy="median")),

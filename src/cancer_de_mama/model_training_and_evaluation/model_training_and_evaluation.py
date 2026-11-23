@@ -46,10 +46,15 @@ class ModelTrainingAndEvaluation:
         """ Confere se a modelagem existe e prepara as pastas de resultados."""
         self.validation_exists_modeling_and_dir(modeling)
 
-        """ Validação Cruzada - Compara os modelos em cinco divisões dos dados."""
+        """ 
+            Validação Cruzada - Compara os modelos em cinco rodadas.
+            Em alguns casos, o modelo pode ter sorteado, por azar valores mais fáceis.
+            Com a validação cruzada ela divide valores diferenciados para não pegar 
+            apenas casos de Malignos ou Benignos.
+        """
         self.cross_validation_results = self.cross_validate_models()
 
-        """ Escolhe o melhor modelo, pela validação cruzada, e o limiar de classificação."""
+        """ Escolhe o melhor modelo, pela validação cruzada já feita acima, e o limiar de classificação."""
         self.select_model_and_refit()
 
         """ Mede o resultado final usando os dados de teste."""
@@ -77,10 +82,13 @@ class ModelTrainingAndEvaluation:
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
 
     def cross_validate_models(self):
-        """Compara os modelos em cinco rodadas, sem usar o teste final."""
+        """ Compara os modelos em cinco rodadas,
+            escolhe um limiar de classificação que favorece a identificação de casos malignos
+        """
         results = []
         print("=== VALIDAÇÃO CRUZADA ESTRATIFICADA (5 PARTES) ===")
 
+        """ Concatena treino e validação"""
         X_development = pd.concat(
             [self.modeling.X_train, self.modeling.X_validation],
             ignore_index=True,
@@ -89,16 +97,22 @@ class ModelTrainingAndEvaluation:
             [self.modeling.y_train, self.modeling.y_validation],
             ignore_index=True,
         )
+
+        """ Constrói o cross_validator com 5 divisões bem espalhadas de benignos e malignos """
         cross_validator = StratifiedKFold(
             n_splits=5,
             shuffle=True,
             random_state=self.RANDOM_STATE,
         )
 
+        """ O fold_metrics vai guardar as métricas de todas as 5 rodadas.
+            out_of_fold_scores terão dados de valores que não foram 
+            treinados de que o modelo deduz que seja positivo (maligno). """
         for name, model in self.modeling.models.items():
             fold_metrics = []
             out_of_fold_scores = np.empty(len(X_development))
 
+            """ Treina e avalia em cada rodada. """
             for train_indices, validation_indices in cross_validator.split(
                 X_development,
                 y_development,
@@ -119,6 +133,7 @@ class ModelTrainingAndEvaluation:
                     X_fold_validation,
                 )
 
+            """ Resume as métricas das cinco rodadas """
             fold_metrics_frame = pd.DataFrame(fold_metrics)
             metrics = {
                 f"{metric}_mean": fold_metrics_frame[metric].mean()
@@ -131,6 +146,10 @@ class ModelTrainingAndEvaluation:
                 }
             )
 
+            """ 
+                Testa diferentes limiares. 
+                A escolha prioriza o F2-score, neste caso, encontrar casos malignos.  
+            """
             threshold, threshold_predictions = self.find_recall_focused_threshold(
                 out_of_fold_scores,
                 y_development,
@@ -153,6 +172,7 @@ class ModelTrainingAndEvaluation:
                 }
             )
             metrics["oof_f2_score"] = threshold_f2
+
             metrics["model"] = name
             metrics["threshold"] = threshold
             results.append(metrics)
@@ -189,11 +209,11 @@ class ModelTrainingAndEvaluation:
             Por isso, “priorizar” não significa garantir que falsos negativos não acontecerão.
         """
 
-
         best_result = self.cross_validation_results.iloc[0]
         self.selected_model_name = best_result["model"]
         self.final_model = clone(self.modeling.models[self.selected_model_name])
         self.selected_threshold = best_result["threshold"]
+
         X_development = pd.concat(
             [self.modeling.X_train, self.modeling.X_validation],
             ignore_index=True,
@@ -202,12 +222,15 @@ class ModelTrainingAndEvaluation:
             [self.modeling.y_train, self.modeling.y_validation],
             ignore_index=True,
         )
+
         self.final_model.fit(X_development, y_development)
         print(f"\nModelo selecionado pela validação: {self.selected_model_name}")
+
         print(
             f"Limiar escolhido pelo F{self.RECALL_BETA}-score "
             f"(prioriza recall maligno): {self.selected_threshold:.4f}"
         )
+
         print(f"Modelo final treinado com {len(X_development)} registros de desenvolvimento.")
 
     def evaluate_on_test(self):
@@ -228,20 +251,8 @@ class ModelTrainingAndEvaluation:
 
         for metric in ("accuracy", "precision", "recall", "f1_score"):
             print(f"{metric}: {metrics[metric]:.3f}")
-        print("\nRelatório por diagnóstico (1 = maligno):")
 
-
-        """ Feature importance: variáveis mais importantes (recall maligno)."""
-        print(
-            classification_report(
-                y_true,
-                predictions,
-                labels=[0, 1],
-                target_names=["Benigno", "Maligno"],
-                zero_division=0,
-            )
-        )
-
+        """ Feature importance: csv das variáveis mais importantes (recall maligno)."""
         pd.DataFrame([metrics]).to_csv(
             self.metrics_dir / "metricas_teste.csv",
             index=False,
