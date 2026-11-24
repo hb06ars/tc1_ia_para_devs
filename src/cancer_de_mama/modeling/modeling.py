@@ -35,13 +35,13 @@ class Modeling:
     def execute(self, data_frame=None):
         print("\n--------- Modelagem ----------------------------------------------------------------\n")
 
-        """ Jogando valores das features (colunas) e id (target) para X e y: X contém as features, e y contém a coluna target. """
+        """ Jogando valores das features (colunas) e diagnosis (target) para X e y: X contém as features, e y contém a coluna target. """
         X, y = self.get_features_and_target(data_frame)
 
         """ SEPARANDO: 70% TREINO, 15% TESTE e 15% VALIDAÇÃO """
         self.get_train_validation_test(X, y)
 
-        """ Define os pipelines de pré-processamento e os modelos de classificação: 
+        """ Define os pipelines de pré-processamento e os modelos de classificação:
             (Regressão Logística, SVM e Árvore de Decisão).
         """
         self.save_models_and_pipelines()
